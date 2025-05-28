@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import time
 from typing import AsyncGenerator
 from amazon_transcribe.client import TranscribeStreamingClient
 from amazon_transcribe.handlers import TranscriptResultStreamHandler
@@ -21,7 +22,8 @@ class TranscriptionHandler(TranscriptResultStreamHandler):
                 continue
             for alt in result.alternatives:
                 self.final_transcript += alt.transcript + " "
-                await self.transcript_callback(alt.transcript)
+                # Pass timestamp and transcript to callback
+                await self.transcript_callback(alt.transcript, time.time())
 
 async def start_transcription(audio_stream: AsyncGenerator[bytes, None], transcript_callback, region: str = "ap-south-1"):
     """Start AWS Transcribe streaming session."""
