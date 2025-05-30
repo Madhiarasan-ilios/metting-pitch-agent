@@ -6,7 +6,7 @@ from audio_input.mic_or_file_streamer import stream_from_mic, stream_from_file
 from transcribe_stream.transcribe_client import start_transcription
 from transcript_store.rolling_transcript import RollingTranscript
 from summarizer.summarizer import generate_minute_summary, generate_summary, generate_title
-from course_generator import generate_course_suggestions
+from course_generator import generate_course_suggestions  # Make sure this is the updated async function
 
 # Configure logging
 logger = logging.getLogger("MainPipeline")

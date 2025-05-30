@@ -47,7 +47,7 @@ async def generate_course_suggestions(json_path: str = "output/summary.json") ->
             "summary": "",
             "meeting_time": -1,
             "retrieved_docs_count": 0,
-            "course_suggestions": [{"message": "nothing yet please wait till process"}],
+            "course_suggestions": [{"course_name": "", "description": "nothing yet please wait till process"}],
             "error": str(e),
             "timestamp": datetime.utcnow().isoformat()
         }
@@ -90,7 +90,7 @@ async def generate_course_suggestions(json_path: str = "output/summary.json") ->
             "summary": summary,
             "meeting_time": meeting_time,
             "retrieved_docs_count": 0,
-            "course_suggestions": [{"message": "nothing yet please wait till process"}],
+            "course_suggestions": [{"course_name": "", "description": "nothing yet please wait till process"}],
             "error": str(e),
             "timestamp": datetime.utcnow().isoformat()
         }
@@ -101,7 +101,7 @@ async def generate_course_suggestions(json_path: str = "output/summary.json") ->
     )
 
     prompt = PromptTemplate(
-        input_variables=["summary", "documents"],
+        input_variables=["summary", "documents"],  # NO 'message' here
         template="""
 You are an academic course recommender. Based on the provided meeting summary and relevant course content, suggest up to three relevant courses that align with the topics discussed. Each course suggestion should include a course name and a brief description (20-30 words) of how it relates to the summary.
 
@@ -114,11 +114,15 @@ Instructions:
 2. Suggest up to three courses with names and brief descriptions.
 3. Output a JSON array of objects, each with "course_name" and "description" keys.
 4. Ensure suggestions are precise, relevant, and based on the provided content.
-5. If no relevant courses can be suggested, return [{"message": "nothing yet please wait till process"}].
+5. If no relevant courses can be suggested, return an empty array [].
 6. Do not include any explanations or extra text outside the JSON array.
 
+Example output:
 [
-    {{"course_name": "Course Name", "description": "Description of relevance"}},
+    {{
+        "course_name": "Introduction to AI",
+        "description": "Covers basics of AI including machine learning and neural networks relevant to the meeting topics."
+    }},
     ...
 ]
 """
@@ -129,17 +133,19 @@ Instructions:
         docs_text = " ".join(retrieved_docs).replace("\n", " ").replace("\r", " ")
         chain = RunnableSequence(prompt | llm)
         result = await chain.ainvoke({"summary": summary, "documents": docs_text})
-        print(f"\nRaw LLM output: {result.content}")
-        
-        # Using re.sub to replace '```json'
+        logger.debug(f"LLM output: {result}")
+
+        # Clean any markdown code blocks if present
         cleaned_content = re.sub(r'```json', '', result.content.strip())
-        
+        cleaned_content = re.sub(r'```', '', cleaned_content).strip()
+        logger.debug(f"Cleaned LLM output: {cleaned_content}")
+
         suggestions = json.loads(cleaned_content)
         if not suggestions:
-            suggestions = [{"message": "nothing yet please wait till process"}]
+            suggestions = [{"course_name": "", "description": "nothing yet please wait till process"}]
     except Exception as e:
         logger.error(f"Error generating suggestions: {e}")
-        suggestions = [{"message": "nothing yet please wait till process"}]
+        suggestions = [{"course_name": "", "description": "nothing yet please wait till process"}]
 
     output = {
         "summary": summary,

@@ -1,14 +1,22 @@
-import os
+import json
 import boto3
 from dotenv import load_dotenv
 from opensearchpy import RequestsHttpConnection
 from requests_aws4auth import AWS4Auth
 from langchain_community.vectorstores import OpenSearchVectorSearch
 from langchain_aws.embeddings import BedrockEmbeddings
+from langchain_aws import ChatBedrock
+from langchain_core.runnables import RunnableSequence
+from langchain.prompts import PromptTemplate
 
 # Load environment variables (if needed)
 load_dotenv()
 
+
+llm = ChatBedrock(
+        model_id="meta.llama3-70b-instruct-v1:0",
+        model_kwargs={"temperature": 0, "max_gen_len": 1024}
+    )
 # Constants
 BEDROCK_MODEL_ID = "amazon.titan-embed-text-v2:0"
 OPENSEARCH_URL = "https://search-meeting-asst-caksjskstlseda5rwmizlllrva.ap-south-1.es.amazonaws.com"
@@ -75,8 +83,47 @@ def query_vector_db_mmr(query_text: str, k: int = 5, fetch_k: int = 20, lambda_p
     except Exception as e:
         print(f"Error querying vector database with MMR: {e}")
         return []
+    
+def response(summary,documents):
+    prompt = PromptTemplate(
+    input_variables=["summary", "documents"],
+    template="""
+You are an academic course recommender. Based on the provided meeting summary and relevant course content, suggest up to three relevant courses that align with the topics discussed. Each course suggestion should include a course name and a brief description (20-30 words) of how it relates to the summary.
+
+Input:
+- Meeting Summary: {summary}
+- Course Content: {documents}
+
+Instructions:
+1. Analyze the summary and course content to identify relevant academic topics.
+2. Suggest up to three courses with names and brief descriptions.
+3. Output a JSON array of objects, each with "course_name" and "description" keys.
+4. Ensure suggestions are precise, relevant, and based on the provided content.
+5. If no relevant courses can be suggested, return [{{"message": "nothing yet please wait till process"}}].
+6. Do not include any explanations or extra text outside the JSON array.
+
+[
+    {{"course_name": "Course Name", "description": "Description of relevance"}},
+    ...
+]
+"""
+)
+
+    chain = RunnableSequence(prompt | llm)
+    result = chain.invoke({"summary": summary, "documents": documents})
+    return result.content
+
+
 
 # --- Run a test query ---
 if __name__ == "__main__":
-    test_query = "ai and llms"
-    query_vector_db_mmr(query_text=test_query, k=5, fetch_k=15, lambda_param=0.7)
+    test_query = "Here is a concise summary of the 1-minute transcript segment:\n\nThe speaker discusses the importance of learning to solve specific problems in data science, using a dataset on crime in the United States as an example. They highlight the skills needed to answer essential questions about differences in crime across states, covering topics such as functions, data types, vector operations, and advanced functional programming. The focus is on applying general programming features, data wrangling, analysis, and visualization to tackle real-world problems."
+    documents=query_vector_db_mmr(query_text=test_query, k=5, fetch_k=15, lambda_param=0.7)
+    response_data = response(test_query, documents)
+    try:
+        # Extract and parse LLM response into JSON
+        json_data = json.loads(response_data.content if hasattr(response_data, "content") else str(response_data))
+        print("Parsed JSON Response:\n", json.dumps(json_data, indent=2))
+    except json.JSONDecodeError as e:
+        print("Error parsing LLM output to JSON:", e)
+        print("Raw Response:", response_data)
