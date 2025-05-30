@@ -4,7 +4,7 @@ from typing import List
 from langchain_aws import ChatBedrock
 from langchain_core.messages import SystemMessage, HumanMessage
 from .prompts import MINUTE_SUMMARY_PROMPT, SUMMARY_PROMPT, TITLE_PROMPT
-from .summary_utils import clean_text, extract_keywords
+from .summary_utils import clean_text
 
 logging.basicConfig(level=logging.INFO)
 
@@ -22,10 +22,7 @@ def generate_minute_summary(current_transcript: str, previous_summaries: List[st
     """Generate a summary for a 1-minute transcript segment using AWS Bedrock."""
     try:
         llm = ChatBedrock(
-            model_id="anthropic.claude-v2",
-            region_name="us-east-1",
-            credentials_profile_name=None
-        )
+            model_id="meta.llama3-70b-instruct-v1:0")
         prev_summary_text = "\n".join(previous_summaries[-2:]) if previous_summaries else "None"
         prompt = MINUTE_SUMMARY_PROMPT.format(
             current_transcript=clean_text(current_transcript),
@@ -45,10 +42,7 @@ def generate_summary(text: str, keywords: List[str]) -> str:
     """Generate a summary using AWS Bedrock."""
     try:
         llm = ChatBedrock(
-            model_id="anthropic.claude-v2",
-            region_name="us-east-1",
-            credentials_profile_name=None
-        )
+            model_id="meta.llama3-70b-instruct-v1:0")
         prompt = SUMMARY_PROMPT.format(transcript=clean_text(text))
         messages = [
             SystemMessage(content="You are a professional meeting assistant."),
@@ -64,9 +58,7 @@ def generate_title(text: str, summary: str) -> str:
     """Generate a title using AWS Bedrock."""
     try:
         llm = ChatBedrock(
-            model_id="anthropic.claude-v2",
-            region_name="us-east-1",
-            credentials_profile_name=None
+            model_id="meta.llama3-70b-instruct-v1:0"
         )
         prompt = TITLE_PROMPT.format(transcript=clean_text(text), summary=summary)
         messages = [
